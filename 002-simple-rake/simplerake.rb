@@ -8,14 +8,19 @@ class SimpleRake
     
     @mode = options[:mode]
     @filename = nil
-    @task = nil
-    @default_segment = []
-    @task_segments = []
-    @task_list = []
-    @default_task = nil
-    @task_information = {}
+    @input_task = nil
+    @task_information_hash = {}
     @execution_sequence = []
-    @execution_sequence_final = []
+
+    $default_task = nil
+
+    $task_information_array = []
+    
+    $descriptor = nil
+    $task = nil
+    $cmd = nil
+    $pre_task = nil
+
     @logger = Logger.new $stderr
 
     # File name is valid?
@@ -23,7 +28,7 @@ class SimpleRake
       fail "Could not get a file name"
     elsif File.file?(ARGV[0]) && File.readable?(ARGV[0])
       @filename = ARGV[0]
-      @task = ARGV[1]
+      @input_task = ARGV[1].to_sym
     else
       fail "File does not exist"
     end
@@ -31,150 +36,120 @@ class SimpleRake
   end
 
   def run
+    
+    get_task_information @filename
 
-    # Divide the file into multiple modules
-    file_segment
-
-    # If default task exist, extract it.
-    if @default_segment.size > 0
-      default_task_extract
-    end
-   
-    # Get task informations: task name, task, cmd and pre_task
-    @task_segments.each do |segment|
-      information = segment_analysize segment
-      task = information[:task]
-      @task_list << task
-      @task_information[task.to_sym] = information
-    end
-
-	  # If there is a "-T" in the command line, list the tasks
     if @mode == 'list_tasks'
-      task_list
+      list_tasks
       exit
     end
 
-    if @task == nil && @default_segment.size == 0
+    if @input_task == nil && $default_task == nil
       fail "No default task, aborted"
     end
 
-    @task ||= @default_task
-    get_execution_sequence @task
+    @input_task ||= @default_task
+    @task_information_hash = array_to_hash $task_information_array
+    get_execution_sequence @input_task
     @execution_sequence.reverse!
-    @execution_sequence_final = get_single_task_sequence @execution_sequence
+    execute
 
-    if @mode == nil
-      execute
+  end
+
+  def get_task_information filename
+    load filename
+  end
+
+  def list_tasks
+    $task_information_array.each do |element|
+      puts "#{element[:task]}                    # #{element[:descriptor]}"
     end
   end
 
-  # Divide the file into multiple modules
-  def file_segment
-    file = File.open(@filename)
-    segment = []
-    file.each_line do |line|
-      if (/^#/ =~ line) || (/^\s$/ =~ line)
-        next
-      elsif /default/ =~ line
-        segment << line
-        @default_segment << segment
-        segment = []
-      elsif /^end$/ =~ line
-        @task_segments << segment
-        segment = []
-      else
-        segment << line
-      end
+  def array_to_hash array
+    hash = {}
+    array.each do |element|
+      hash[element[:task]] = element
     end
-    file.close
-  end
-
-  # If default task exist, extract it.
-  def default_task_extract
-    if /=>\s:(.*)/ =~ @default_segment[0][0]
-      @default_task = $1
-    end
-  end
-
-  # Get task information
-  def segment_analysize segment
-    information = {:name => nil, :task => nil, :cmd => nil, :pre_task => nil}
-    segment.each do |line|
-      if /desc\s'(.*)'/ =~ line
-        information[:name] = $1
-      end
-      if /task\s:(.*)\s/ =~ line
-        information[:task] = $1
-      end
-      if /sh\s'(.*)'/ =~ line
-        information[:cmd] = $1
-      end
-    end
-    if /(.*)\s=>\s(.*)\sdo/ =~ information[:task]
-      information[:task] = $1
-      information[:pre_task] = $2
-    elsif /(.*)\sdo/ =~ information[:task]
-      information[:task] = $1
-    end
-    if information[:pre_task]
-      information[:pre_task].gsub!(':','').gsub!(',','')
-      information[:pre_task].delete!('[')
-      information[:pre_task].delete!(']')
-    end
-    puts information
-    return information
+    return hash
   end
 
   def get_execution_sequence task
-    if @task_information[task.to_sym]
+    if @task_information_hash[task]
       @execution_sequence << task
       get_pre_task task
     else
       fail 'Could not find the task.'
-    end 
+    end
   end
 
   def get_pre_task task
-    if @task_information[task.to_sym][:pre_task] == nil
+    if @task_information_hash[task][:pre_task] == nil
       return
     else
-      pre_task = @task_information[task.to_sym][:pre_task]
+      pre_task = @task_information_hash[task][:pre_task]
       @execution_sequence << pre_task
-      pre_task = pre_task.split(' ')
-      pre_task.each do |t|
-        get_pre_task t
-      end
-    end
-  end
-
-  def get_single_task_sequence sequence
-    single_task_sequence = []
-    sequence.each do |element|
-      element = element.split(' ')
-      element.each do |single_task|
-        if single_task_sequence.include?single_task
-          next
-        else
-          single_task_sequence << single_task
+      if pre_task.is_a?(Symbol)
+        get_pre_task pre_task
+      else
+        pre_task.each do |t|
+          get_pre_task t
         end
       end
     end
-    return single_task_sequence
   end
 
   def execute
-    @execution_sequence_final.each do |task|
-      cmd = @task_information[task.to_sym][:cmd]
-      system cmd
+    implemented_task = []
+    @execution_sequence.each do |element|
+      if element.is_a?(Symbol)
+        if implemented_task.include?(element)
+          next
+        else
+          puts @task_information_hash[element][:descriptor]
+          implemented_task << element
+        end
+      else
+        element.each do |e|
+          if implemented_task.include?(e)
+            next
+          else
+            puts @task_information_hash[e][:descriptor]
+            implemented_task << e
+          end
+        end
+      end
     end
   end
 
-  def task_list
-    @task_list.each do |task|
-      puts "#{@task_information[task.to_sym][:task]}          # #{@task_information[task.to_sym][:name]}"
-    end
-  end
+end
 
+def desc descriptor
+  $descriptor = descriptor
+end
+
+def task task
+
+  information = {:descriptor => nil, :task => nil, :cmd => nil, :pre_task => nil}
+  if task.is_a?(Hash)
+    if task.first[0] == :default
+      $default_task = task.first[1]
+      return
+    else
+      information[:task] = task.first[0]
+      information[:pre_task] = task.first[1]
+    end
+  else
+    information[:task] = task
+  end
+  information[:descriptor] = $descriptor
+  $descriptor = nil
+  #puts information
+  $task_information_array << information
+end
+
+def sh cmd
+  $task_information_array[-1][:cmd] = cmd
 end
 
 
@@ -197,3 +172,4 @@ if __FILE__ == $0
 simplerake = SimpleRake.new options
 simplerake.run
 end
+
