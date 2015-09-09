@@ -18,6 +18,7 @@ class SimpleRake
     @execution_sequence_final = []
     @logger = Logger.new $stderr
 
+    # File name is valid?
     if ARGV.empty?
       fail "Could not get a file name"
     elsif File.file?(ARGV[0]) && File.readable?(ARGV[0])
@@ -47,6 +48,7 @@ class SimpleRake
       @task_information[task.to_sym] = information
     end
 
+	  # If there is a "-T" in the command line, list the tasks
     if @mode == 'list_tasks'
       task_list
       exit
