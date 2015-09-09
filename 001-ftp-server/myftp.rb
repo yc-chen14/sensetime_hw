@@ -113,26 +113,26 @@ class Myftp
           sock.puts "Already Passive Mode"
         end
 
-       when "LIST" then
-	 if @mode == "" then
-           enter_passive_mode(sock)
-	 end
-	 sock.puts "150 File status okay; about to open data connection."
-	 client = @dataSocks[0].accept
-         client.puts(`ls -l`)
-         sock.puts "226 Transfer complete."
-         client.close  
+      when "LIST" then
+	if @mode == "" then
+          enter_passive_mode(sock)
+	end
+	sock.puts "150 File status okay; about to open data connection."
+	client = @dataSocks[0].accept
+        client.puts(`ls -l`)
+        sock.puts "226 Transfer complete."
+        client.close  
 
-       when "CWD" then
-	 if @mode == "" then
- 	   enter_passive_mode(sock)
-	 end
-	 if File.directory?(cmd[1]) && File.readable?(cmd[1]) then
-	   Dir.chdir (cmd[1])
-           sock.puts "250 CWD command successful"
-	 else
-	   sock.puts "550 No such file or directory"
-	 end
+      when "CWD" then
+	if @mode == "" then
+ 	  enter_passive_mode(sock)
+	end
+	if File.directory?(cmd[1]) && File.readable?(cmd[1]) then
+	  Dir.chdir (cmd[1])
+          sock.puts "250 CWD command successful"
+	else
+	  sock.puts "550 No such file or directory"
+	end
 
       when "PWD" then
         if @mode == "" then
