@@ -106,7 +106,8 @@ class SimpleRake
         if implemented_task.include?(element)
           next
         else
-          puts @task_information_hash[element][:descriptor]
+          #puts @task_information_hash[element][:descriptor]
+          @task_information_hash[element][:cmd].call
           implemented_task << element
         end
       else
@@ -114,7 +115,8 @@ class SimpleRake
           if implemented_task.include?(e)
             next
           else
-            puts @task_information_hash[e][:descriptor]
+            #puts @task_information_hash[e][:descriptor]
+            @task_information_hash[e][:cmd].call
             implemented_task << e
           end
         end
@@ -128,7 +130,7 @@ def desc descriptor
   $descriptor = descriptor
 end
 
-def task task
+def task task, &code
 
   information = {:descriptor => nil, :task => nil, :cmd => nil, :pre_task => nil}
   if task.is_a?(Hash)
@@ -144,12 +146,13 @@ def task task
   end
   information[:descriptor] = $descriptor
   $descriptor = nil
+  information[:cmd] = code
   #puts information
   $task_information_array << information
 end
 
 def sh cmd
-  $task_information_array[-1][:cmd] = cmd
+  system(cmd)
 end
 
 
@@ -172,4 +175,3 @@ if __FILE__ == $0
 simplerake = SimpleRake.new options
 simplerake.run
 end
-
